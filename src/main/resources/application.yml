@@ -1,0 +1,41 @@
+server:
+  port: 8075
+
+spring:
+  application:
+    name: API_Gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+      routes:
+        - id: trains-service
+          uri: lb://TRAINS-SERVICE
+          predicates:
+            - Path=/api/trains/**
+
+        - id: training-service
+          uri: lb://TRAINING-SERVICE
+          predicates:
+            - Path=/api/training/**
+
+        - id: nutrition-service
+          uri: lb://NUTRITION-SERVICE
+          predicates:
+            - Path=/api/nutrition/**
+
+        - id: notification-service
+          uri: lb://NOTIFICATION-SERVICE
+          predicates:
+            - Path=/api/notifications/**
+
+        - id: recommendation-service
+          uri: lb://RECOMMENDATION-SERVICE
+          predicates:
+            - Path=/api/recommendations/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
