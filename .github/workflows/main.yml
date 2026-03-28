@@ -11,33 +11,38 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
+  # 1. Сборка проекта и прогон тестов
   build:
     runs-on: ubuntu-latest
     steps:
-      - [cite_start]uses: actions/checkout@v4 [cite: 1]
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-                      java-version: '21'
-                      distribution: 'temurin'
-          [cite_start]cache: maven [cite: 1]
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
 
       - name: Build with Maven & Run Tests
-        [cite_start]run: mvn clean package [cite: 1]
+        run: mvn clean package
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: gateway-jar
           path: target/*.jar
+          retention-days: 1
 
+  # 2. Сборка Docker-образа и отправка в Docker Hub
   deploy-image:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
@@ -51,6 +56,9 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
@@ -59,3 +67,5 @@ jobs:
           tags: |
             ${{ env.DOCKER_IMAGE }}:latest
             ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
