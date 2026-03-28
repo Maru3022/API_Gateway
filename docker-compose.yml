@@ -1,0 +1,22 @@
+services:
+  eureka-server:
+    image: maru3022/eureka-server:latest
+    ports:
+      - "8761:8761"
+    networks:
+      - training-network
+
+  api-gateway:
+    build: .
+    ports:
+      - "8075:8075"
+    environment:
+      - EUREKA_SERVER_URL=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+    networks:
+      - training-network
+
+networks:
+  training-network:
+    driver: bridge
