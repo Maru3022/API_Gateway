@@ -11,28 +11,29 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  # 1. Сборка JAR файла и прогон тестов
+  # 1. Сборка JAR-файла и прогон тестов
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        [cite_start]uses: [cite: 1] actions/checkout@v4
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
+                      java-version: '21'
+                      distribution: 'temurin'
+          [cite_start]cache: [cite: 1] maven
 
       - name: Build with Maven
-        # Убираем working-directory, так как pom.xml в корне репозитория
-        run: mvn clean package -DskipTests
+        # Запускаем сборку из корня, так как pom.xml находится там
+        [cite_start]run: [cite: 1] mvn clean package -DskipTests
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: gateway-jar
+          # Путь к JAR-файлу в корневой папке target
           path: target/*.jar
           retention-days: 1
 
@@ -42,12 +43,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        [cite_start]uses: [cite: 1] actions/checkout@v4
 
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
           name: gateway-jar
+          # Скачиваем JAR в папку target, чтобы Dockerfile (из корня) его увидел [cite: 2]
           path: target/
 
       - name: Set up Docker Buildx
@@ -56,7 +58,7 @@ jobs:
       - name: Build Docker Image
         uses: docker/build-push-action@v5
         with:
-          # Контекст сборки - корень репозитория
+          # Контекст сборки — корень репозитория, где лежит Dockerfile
           context: .
           push: false
           tags: |
