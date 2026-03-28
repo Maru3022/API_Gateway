@@ -49,18 +49,9 @@ jobs:
           name: gateway-jar
           path: target/
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker
-
       - name: Build Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          load: true
-          tags: |
-            ${{ env.DOCKER_IMAGE }}:latest
-            ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+        run: |
+          docker build \
+            -t ${{ env.DOCKER_IMAGE }}:latest \
+            -t ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }} \
+            .
