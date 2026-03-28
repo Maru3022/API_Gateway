@@ -11,7 +11,7 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  # 1. Сборка JAR-файла и прогон тестов
+  # 1. Сборка JAR-файла
   build:
     runs-on: ubuntu-latest
     steps:
@@ -35,7 +35,7 @@ jobs:
           path: target/*.jar
           retention-days: 1
 
-  # 2. Тестовая сборка Docker-образа
+  # 2. Сборка Docker-образа
   build-docker:
     needs: build
     runs-on: ubuntu-latest
@@ -52,17 +52,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          driver: docker   # используем обычный docker-драйвер, не container
+          driver: docker
 
       - name: Build Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile   # явно указываем путь к Dockerfile
+          file: ./Dockerfile
           push: false
-          load: true           # загружаем образ в локальный Docker daemon
+          load: true
           tags: |
             ${{ env.DOCKER_IMAGE }}:latest
             ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
