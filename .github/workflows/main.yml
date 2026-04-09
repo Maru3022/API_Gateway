@@ -7,13 +7,16 @@ on:
     branches: [ "main" ]
 
 env:
-  DOCKER_IMAGE: api-gateway
-  IMAGE_TAG: ${{ github.sha }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/api-gateway
 
 jobs:
-  # 1. Сборка JAR-файла
-  build:
+  # 1. Сборка, тестирование и статический анализ
+  build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,8 +28,18 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven
-        run: mvn clean package -DskipTests
+      # Запускаем тесты! В хорошем CI/CD код без прохождения тестов не собирается
+      - name: Build and Test with Maven
+        run: mvn clean verify
+
+      # Сканирование зависимостей (pom.xml) на уязвимости
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -35,10 +48,14 @@ jobs:
           path: target/*.jar
           retention-days: 1
 
-  # 2. Сборка Docker-образа
-  build-docker:
-    needs: build
+  # 2. Сборка Docker-образа, его сканирование и публикация
+  build-and-push-docker:
+    needs: build-and-test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Нужно для пуша в GitHub Container Registry
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -49,9 +66,41 @@ jobs:
           name: gateway-jar
           path: target/
 
-      - name: Build Docker Image
-        run: |
-          docker build \
-            -t ${{ env.DOCKER_IMAGE }}:latest \
-            -t ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }} \
-            .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # Токен генерируется автоматически GitHub-ом
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }} # Пушим только если это не PR
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Сканируем уже собранный Docker-образ на уязвимости ОС
+      - name: Run Trivy vulnerability scanner on image
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          format: 'table'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
