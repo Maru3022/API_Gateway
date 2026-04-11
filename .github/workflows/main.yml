@@ -34,7 +34,7 @@ jobs:
 
       # Сканирование зависимостей (pom.xml) на уязвимости
       - name: Run Trivy vulnerability scanner in repo mode
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.30.0
         with:
           scan-type: 'fs'
           ignore-unfixed: true
@@ -98,7 +98,7 @@ jobs:
       # Сканируем уже собранный Docker-образ на уязвимости ОС
       - name: Run Trivy vulnerability scanner on image
         if: github.event_name != 'pull_request'
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.30.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: 'table'
