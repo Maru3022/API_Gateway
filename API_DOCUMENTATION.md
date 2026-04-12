@@ -704,32 +704,6 @@ eureka:
 | `EUREKA_SERVER_URL` | `http://eureka-server:8761/eureka/` | Eureka server URL |
 | `JAVA_OPTS` | (none) | JVM options (e.g., `-Xmx512m -Xms256m`) |
 
-### Docker Configuration
-
-**File:** `docker-compose.yml`
-
-```yaml
-version: '3.8'
-services:
-  eureka-server:
-    image: eureka-server:latest
-    ports:
-      - "8761:8761"
-  
-  api-gateway:
-    build: .
-    ports:
-      - "8075:8075"
-    environment:
-      - EUREKA_SERVER_URL=http://eureka-server:8761/eureka/
-    depends_on:
-      - eureka-server
-```
-
-**Key Points:**
-- Gateway depends on Eureka server being available
-- Environment variables are passed to configure Eureka client
-
 ---
 
 ## Development Guide
@@ -747,12 +721,9 @@ API_Gateway/
 │   └── test/
 │       └── java/com/example/api_gateway/
 │           └── ApiGatewayApplicationTests.java  # Smoke test
-├── docker-compose.yml                           # Docker orchestration
-├── Dockerfile                                   # Container image definition
 ├── pom.xml                                      # Maven dependencies
 ├── prometheus.yml                               # Prometheus scrape config
 └── monitoring/                                  # Monitoring stack
-    ├── docker-compose.monitoring.yml
     ├── prometheus/
     └── grafana/
 ```
@@ -901,12 +872,7 @@ logging:
 
 ### Monitoring with Grafana
 
-1. **Start monitoring stack:**
-
-```bash
-cd monitoring
-docker-compose -f docker-compose.monitoring.yml up -d
-```
+1. **Configure monitoring stack**
 
 2. **Access Grafana:**
    - URL: `http://localhost:3000`
@@ -926,18 +892,14 @@ docker-compose -f docker-compose.monitoring.yml up -d
 
 ### Deployment
 
-#### Docker Deployment
+#### Manual Deployment
 
 ```bash
-# Build image
-docker build -t api-gateway:latest .
+# Build the application
+mvn clean package -DskipTests
 
-# Run container
-docker run -d \
-  --name api-gateway \
-  -p 8075:8075 \
-  -e EUREKA_SERVER_URL=http://eureka-server:8761/eureka/ \
-  api-gateway:latest
+# Run the JAR
+java -jar target/*.jar
 ```
 
 #### Kubernetes Deployment
@@ -1013,12 +975,6 @@ spec:
 ### Common Commands
 
 ```bash
-# Start application stack
-docker-compose up --build
-
-# Start monitoring
-cd monitoring && docker-compose -f docker-compose.monitoring.yml up -d
-
 # Build project
 mvn clean package
 
@@ -1028,11 +984,11 @@ mvn test
 # Run with skip tests
 mvn clean package -DskipTests
 
-# View logs
-docker-compose logs -f api-gateway
+# Start application
+java -jar target/*.jar
 
-# Restart gateway
-docker-compose restart api-gateway
+# View logs (when running as background process)
+tail -f logs/application.log
 ```
 
 ---
@@ -1042,14 +998,14 @@ docker-compose restart api-gateway
 ### Logs Location
 
 ```bash
-# Docker logs
-docker-compose logs api-gateway
+# Application logs (when running in background)
+tail -f logs/application.log
 
 # Follow logs in real-time
-docker-compose logs -f api-gateway
+tail -f logs/application.log
 
 # Last 100 lines
-docker-compose logs --tail=100 api-gateway
+tail -n 100 logs/application.log
 ```
 
 ### Useful Queries for Troubleshooting

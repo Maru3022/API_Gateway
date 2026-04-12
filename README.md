@@ -41,9 +41,8 @@ API_Gateway/
 │   │       │   └── dashboards.yml
 │   │       └── datasources/
 │   │           └── datasource.yml
-│   ├── prometheus/
-│   │   └── prometheus.yml
-│   └── docker-compose.monitoring.yml  # Monitoring stack
+│   └── prometheus/
+│       └── prometheus.yml
 ├── src/
 │   ├── main/
 │   │   ├── java/com/example/api_gateway/
@@ -51,8 +50,6 @@ API_Gateway/
 │   │   └── resources/
 │   │       └── application.yml
 │   └── test/
-├── docker-compose.yml                 # App stack (gateway + eureka)
-├── Dockerfile                         # Multi-stage build
 └── pom.xml
 ```
 
@@ -60,19 +57,7 @@ API_Gateway/
 
 ## 🚀 Getting Started
 
-### Option 1 — Docker Compose (recommended)
-
-```bash
-# Start Eureka + API Gateway
-docker-compose up --build
-```
-
-| Service      | URL                         |
-|--------------|-----------------------------|
-| API Gateway  | http://localhost:8075        |
-| Eureka UI    | http://localhost:8761        |
-
-### Option 2 — Run locally (Maven)
+### Run locally (Maven)
 
 > ⚠️ Requires Eureka Server running on `http://localhost:8761`
 
@@ -85,13 +70,7 @@ java -jar target/*.jar
 
 ## 📊 Monitoring (Prometheus + Grafana)
 
-Run the monitoring stack separately **after** the main app is up:
-
-```bash
-# From the monitoring/ directory
-cd monitoring
-docker-compose -f docker-compose.monitoring.yml up -d
-```
+Configure Prometheus and Grafana separately for monitoring.
 
 | Service    | URL                    | Credentials  |
 |------------|------------------------|--------------|
@@ -161,49 +140,17 @@ eureka:
 
 ---
 
-## 🐳 Docker
-
-### Dockerfile (multi-stage)
-
-```
-Stage 1 — Build   (maven:3.9.6-eclipse-temurin-21)
-  └── mvn clean package -DskipTests
-
-Stage 2 — Runtime (eclipse-temurin:21-jre)
-  └── java -jar app.jar
-```
-
-```bash
-# Build image manually
-docker build -t api-gateway .
-
-# Run manually
-docker run -p 8075:8075 \
-  -e EUREKA_SERVER_URL=http://eureka-server:8761/eureka/ \
-  api-gateway
-```
-
----
-
 ## 🔄 CI/CD Pipeline
 
 GitHub Actions workflow (`.github/workflows/main.yml`) runs on every push/PR to `main`:
 
 ```
 ┌─────────────────────────────────────┐
-│  Job 1: build                       │
+│  Job: build-and-test                │
 │  • Checkout code                    │
 │  • Set up JDK 21 (Temurin)         │
-│  • mvn clean package -DskipTests    │
-│  • Upload JAR as artifact           │
-└──────────────┬──────────────────────┘
-               │ needs: build
-┌──────────────▼──────────────────────┐
-│  Job 2: build-docker                │
-│  • Checkout code                    │
-│  • Download JAR artifact            │
-│  • Set up Docker Buildx             │
-│  • Build Docker image (push: false) │
+│  • mvn clean verify                 │
+│  • Trivy vulnerability scanning    │
 └─────────────────────────────────────┘
 ```
 
@@ -220,7 +167,6 @@ GitHub Actions workflow (`.github/workflows/main.yml`) runs on every push/PR to 
 | Spring Boot Actuator               | Health & metrics endpoints  |
 | Micrometer + Prometheus            | Metrics export              |
 | Maven                              | Build tool                  |
-| Docker (multi-stage)               | Containerization            |
 | Prometheus + Grafana               | Monitoring & dashboards     |
 | GitHub Actions                     | CI/CD                       |
 
