@@ -14,22 +14,32 @@ spring:
           uri: lb://TRAINS-SERVICE
           predicates:
             - Path=/api/trains/**
+          filters:
+            - RewritePath=/api/trains/?(?<segment>.*), /trains/$\{segment}
         - id: training-service
           uri: lb://TRAINING-SERVICE
           predicates:
             - Path=/api/training/**
+          filters:
+            - RewritePath=/api/training/?(?<segment>.*), /trainings/$\{segment}
         - id: nutrition-service
           uri: lb://NUTRITION-SERVICE
           predicates:
             - Path=/api/nutrition/**
+          filters:
+            - RewritePath=/api/nutrition/?(?<segment>.*), /nutrition/$\{segment}
         - id: notification-service
           uri: lb://NOTIFICATION-SERVICE
           predicates:
             - Path=/api/notifications/**
+          filters:
+            - RewritePath=/api/notifications/?(?<segment>.*), /notifications/$\{segment}
         - id: recommendation-service
           uri: lb://RECOMMENDATION-SERVICE
           predicates:
             - Path=/api/recommendations/**
+          filters:
+            - RewritePath=/api/recommendations/?(?<segment>.*), /recommendations/$\{segment}
 
 management:
   endpoints:
