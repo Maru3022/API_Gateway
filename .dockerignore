@@ -1,0 +1,7 @@
+.git
+.github
+.idea
+.qwen
+target
+monitoring
+*.md

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: fitness-platform
+data:
+  EUREKA_SERVER_URL: "http://eureka-server:8761/eureka/"

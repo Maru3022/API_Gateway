@@ -1040,3 +1040,60 @@ When modifying the API Gateway:
 
 *Last Updated: April 11, 2026*
 *Version: 1.0.0*
+
+---
+
+## Kubernetes Deployment (Added)
+
+The repository now includes production-ready Kubernetes manifests under `k8s/`:
+
+- `namespace.yaml`
+- `configmap.yaml`
+- `deployment.yaml`
+- `service.yaml`
+- `hpa.yaml`
+- `ingress.yaml`
+- `kustomization.yaml`
+
+### Deployment Characteristics
+- 2 replicas by default.
+- Readiness and liveness probes via `/actuator/health`.
+- Horizontal Pod Autoscaler (CPU + memory based).
+- Pod security hardening: non-root, read-only root filesystem, dropped capabilities.
+- Configuration via ConfigMap (`EUREKA_SERVER_URL`).
+
+### Deploy Command
+
+```bash
+kubectl apply -k k8s
+```
+
+### Post-Deploy Verification
+
+```bash
+kubectl -n fitness-platform get pods,svc,hpa,ingress
+kubectl -n fitness-platform rollout status deploy/api-gateway
+```
+
+---
+
+## CI/CD Pipeline (Extended)
+
+The GitHub Actions pipeline in `.github/workflows/main.yml` now includes:
+
+1. Kubernetes manifest rendering and schema validation (`kustomize` + `kubeconform`).
+2. Maven build and full test verification (`mvn clean verify`).
+3. Filesystem vulnerability scanning with Trivy (SARIF upload).
+4. Docker image build with Buildx and conditional push to GHCR.
+5. Container image vulnerability scanning with Trivy (SARIF upload).
+6. SBOM generation (CycloneDX) for published image.
+
+### Required GitHub Permissions/Setup
+- `packages: write` for image publishing to GHCR.
+- `security-events: write` for SARIF upload.
+- Default `GITHUB_TOKEN` is used for GHCR auth in workflow.
+
+---
+
+*Last Updated: April 24, 2026*
+*Version: 1.1.0*
