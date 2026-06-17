@@ -1,4 +1,4 @@
-server:
+﻿server:
   port: 8075
 
 spring:
@@ -9,37 +9,98 @@ spring:
       discovery:
         locator:
           enabled: true
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
       routes:
         - id: trains-service
-          uri: lb://TRAINS-SERVICE
+          uri: lb://trains-service
           predicates:
-            - Path=/api/trains/**
+            - Path=/api/users/**
           filters:
-            - RewritePath=/api/trains/?(?<segment>.*), /trains/$\{segment}
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                rate-limiter: "#{@inMemoryRateLimiter}"
+            - name: CircuitBreaker
+              args:
+                name: trainsCircuitBreaker
+                fallbackUri: forward:/fallback
         - id: training-service
-          uri: lb://TRAINING-SERVICE
+          uri: lb://training-service
           predicates:
-            - Path=/api/training/**
+            - Path=/api/cabinets/**
           filters:
-            - RewritePath=/api/training/?(?<segment>.*), /trainings/$\{segment}
-        - id: nutrition-service
-          uri: lb://NUTRITION-SERVICE
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                rate-limiter: "#{@inMemoryRateLimiter}"
+            - name: CircuitBreaker
+              args:
+                name: trainingCircuitBreaker
+                fallbackUri: forward:/fallback
+        - id: training-nutrition
+          uri: lb://training-nutrition
           predicates:
             - Path=/api/nutrition/**
           filters:
-            - RewritePath=/api/nutrition/?(?<segment>.*), /nutrition/$\{segment}
-        - id: notification-service
-          uri: lb://NOTIFICATION-SERVICE
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                rate-limiter: "#{@inMemoryRateLimiter}"
+            - name: CircuitBreaker
+              args:
+                name: nutritionCircuitBreaker
+                fallbackUri: forward:/fallback
+        - id: training-notification
+          uri: lb://training-notification
           predicates:
             - Path=/api/notifications/**
           filters:
-            - RewritePath=/api/notifications/?(?<segment>.*), /notifications/$\{segment}
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                rate-limiter: "#{@inMemoryRateLimiter}"
+            - name: CircuitBreaker
+              args:
+                name: notificationCircuitBreaker
+                fallbackUri: forward:/fallback
         - id: recommendation-service
-          uri: lb://RECOMMENDATION-SERVICE
+          uri: lb://recommendation-service
           predicates:
             - Path=/api/recommendations/**
           filters:
-            - RewritePath=/api/recommendations/?(?<segment>.*), /recommendations/$\{segment}
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                rate-limiter: "#{@inMemoryRateLimiter}"
+            - name: CircuitBreaker
+              args:
+                name: recommendationCircuitBreaker
+                fallbackUri: forward:/fallback
+        - id: saga-orchestrator
+          uri: lb://saga-orchestrator
+          predicates:
+            - Path=/api/saga/**
+          filters:
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                rate-limiter: "#{@inMemoryRateLimiter}"
+            - name: CircuitBreaker
+              args:
+                name: sagaCircuitBreaker
+                fallbackUri: forward:/fallback
 
 management:
   endpoints:
@@ -51,12 +112,16 @@ management:
       enabled: true
     health:
       show-details: always
+      probes:
+        enabled: true
   metrics:
     tags:
       application: ${spring.application.name}
 
 eureka:
   client:
+    register-with-eureka: false
+    fetch-registry: true
     service-url:
       defaultZone: ${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}
   instance:
