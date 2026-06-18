@@ -1,9 +1,13 @@
-﻿server:
+server:
   port: 8075
 
 spring:
   application:
     name: API_Gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   cloud:
     gateway:
       discovery:
@@ -26,7 +30,7 @@ spring:
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
-                rate-limiter: "#{@inMemoryRateLimiter}"
+                rate-limiter: "#{@redisRateLimiter}"
             - name: CircuitBreaker
               args:
                 name: trainsCircuitBreaker
@@ -40,7 +44,7 @@ spring:
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
-                rate-limiter: "#{@inMemoryRateLimiter}"
+                rate-limiter: "#{@redisRateLimiter}"
             - name: CircuitBreaker
               args:
                 name: trainingCircuitBreaker
@@ -54,7 +58,7 @@ spring:
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
-                rate-limiter: "#{@inMemoryRateLimiter}"
+                rate-limiter: "#{@redisRateLimiter}"
             - name: CircuitBreaker
               args:
                 name: nutritionCircuitBreaker
@@ -68,7 +72,7 @@ spring:
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
-                rate-limiter: "#{@inMemoryRateLimiter}"
+                rate-limiter: "#{@redisRateLimiter}"
             - name: CircuitBreaker
               args:
                 name: notificationCircuitBreaker
@@ -82,7 +86,7 @@ spring:
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
-                rate-limiter: "#{@inMemoryRateLimiter}"
+                rate-limiter: "#{@redisRateLimiter}"
             - name: CircuitBreaker
               args:
                 name: recommendationCircuitBreaker
@@ -96,17 +100,45 @@ spring:
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
-                rate-limiter: "#{@inMemoryRateLimiter}"
+                rate-limiter: "#{@redisRateLimiter}"
             - name: CircuitBreaker
               args:
                 name: sagaCircuitBreaker
                 fallbackUri: forward:/fallback
 
+gateway:
+  rate-limiter:
+    replenish-rate: ${RATE_LIMITER_REPLENISH_RATE:10}
+    burst-capacity: ${RATE_LIMITER_BURST_CAPACITY:20}
+  jwt:
+    user-id-header: ${JWT_USER_ID_HEADER:X-User-Id}
+  fallback:
+    error-message: ${FALLBACK_ERROR_MESSAGE:Service temporarily unavailable}
+    error-key: ${FALLBACK_ERROR_KEY:error}
+    correlation-id-key: ${FALLBACK_CORRELATION_ID_KEY:correlationId}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 5s
+
 management:
   endpoints:
     web:
       exposure:
-        include: health, info, prometheus
+        include: health, info, prometheus, metrics, gateway
   endpoint:
     prometheus:
       enabled: true
@@ -117,6 +149,18 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.9, 0.95, 0.99
+  tracing:
+    sampling:
+      probability: 1.0
+
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm}
+  expiration: ${JWT_EXPIRATION:86400000}
 
 eureka:
   client:
@@ -126,3 +170,7 @@ eureka:
       defaultZone: ${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}
   instance:
     prefer-ip-address: true
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
