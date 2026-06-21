@@ -1,131 +1,183 @@
-# API Gateway
+# 🌐 API Gateway
 
-Spring Cloud Gateway for the Fitness Microservices Platform.
+Единая точка входа фитнес-платформы [FitFlow](https://github.com/Maru3022/project-hub). Реактивный Spring Cloud Gateway с JWT-аутентификацией, rate limiting на Redis, circuit breaker на каждый downstream-сервис и сквозной трассировкой запросов.
 
-## What Is Included
-- Dynamic routing to backend microservices through Eureka service discovery.
-- Actuator endpoints for health and Prometheus metrics.
-- Monitoring stack (Prometheus + Grafana) via Docker Compose.
-- Kubernetes manifests for production-style deployment.
-- Advanced GitHub Actions CI/CD pipeline with security gates and image publishing.
+[![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)](.)
+[![Spring Cloud Gateway](https://img.shields.io/badge/Spring%20Cloud%20Gateway-Reactive-6DB33F?logo=spring)](.)
+[![Resilience4j](https://img.shields.io/badge/Resilience4j-Circuit%20Breaker-ff6b35)](.)
+[![Redis](https://img.shields.io/badge/Redis-Rate%20Limiting-DC382D?logo=redis)](.)
+[![JWT](https://img.shields.io/badge/Auth-JWT%20(HS256)-000000?logo=jsonwebtokens)](.)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-HPA%20%2F%20Ingress-326CE5?logo=kubernetes)](.)
 
-## Architecture
-Client -> API Gateway (:8075) -> discovered services via Eureka (:8761)
+---
 
-Routes configured in [src/main/resources/application.yml](src/main/resources/application.yml):
-- `/api/trains/**` -> `TRAINS-SERVICE`
-- `/api/training/**` -> `TRAINING-SERVICE`
-- `/api/nutrition/**` -> `NUTRITION-SERVICE`
-- `/api/notifications/**` -> `NOTIFICATION-SERVICE`
-- `/api/recommendations/**` -> `RECOMMENDATION-SERVICE`
+## Что делает сервис
 
-## Requirements
-- Java 21
-- Maven 3.9+
-- Docker (for monitoring and image build)
-- Kubernetes cluster 1.27+ (for k8s deployment)
-- Eureka Server reachable from Gateway and microservices
+API Gateway — не «прокси для галочки», а полноценный edge-слой системы, на котором решены задачи, которые иначе пришлось бы дублировать в каждом из 6 бизнес-сервисов:
 
-## Local Run (Without Kubernetes)
-1. Start Eureka Server (for local use typically `http://localhost:8761/eureka/`).
-2. Start backend microservices and ensure they register in Eureka with expected names.
-3. Start API Gateway:
+- **Маршрутизация** запросов к сервисам по имени из Eureka (`lb://service-name`), без хардкода адресов;
+- **JWT-аутентификация на границе системы** — токен проверяется один раз на Gateway, а вниз по цепочке сервисы получают уже доверенный `X-User-Id`;
+- **Rate limiting** — token bucket на Redis, отдельный лимит на клиента;
+- **Circuit breaker на каждый маршрут** — отказ одного сервиса не валит всю систему, а отдаёт контролируемый fallback;
+- **Сквозная трассировка** — `X-Correlation-Id` генерируется (или подхватывается) на входе и прокидывается через все логи и downstream-запросы;
+- **Унифицированная обработка ошибок** — единый JSON-формат ошибки вместо «голого» стектрейса реактивного стека.
 
-```powershell
-cd C:\Project\API_Gateway
-$env:EUREKA_SERVER_URL="http://localhost:8761/eureka/"
-.\mvnw.cmd clean package -DskipTests
-java -jar target\API_Gateway-0.0.1-SNAPSHOT.jar
+## Маршрутизация
+
+| Маршрут | Сервис (Eureka) | Path Predicate |
+|---|---|---|
+| `/api/users/**` | `trains-service` | `StripPrefix=1` |
+| `/api/cabinets/**` | `training-service` | `StripPrefix=1` |
+| `/api/nutrition/**` | `training-nutrition` | `StripPrefix=1` |
+| `/api/notifications/**` | `training-notification` | `StripPrefix=1` |
+| `/api/recommendations/**` | `recommendation-service` | `StripPrefix=1` |
+| `/api/saga/**` | `saga-orchestrator` | `StripPrefix=1` |
+
+Каждый маршрут оборачивается одним и тем же набором фильтров — **rate limiter + circuit breaker** — конфигурация декларативная (`application.yml`), без копипасты Java-кода на каждый сервис.
+
+## Цепочка фильтров запроса
+
+```
+Клиент
+  │
+  ▼
+GlobalCorrelationIdFilter      — генерирует/подхватывает X-Correlation-Id (ORDER: HIGHEST_PRECEDENCE)
+  │
+  ▼
+GlobalLoggingFilter            — структурированный лог: method, path, correlationId, status, durationMs
+  │
+  ▼
+JwtAuthenticationFilter        — если есть Bearer-токен: валидирует подпись/срок, кладёт username в X-User-Id;
+  │                               невалидный токен → 401 без похода в downstream
+  ▼
+RequestRateLimiter (Redis)     — token bucket по ключу клиента, 429 при превышении лимита
+  │
+  ▼
+CircuitBreaker (Resilience4j)  — при открытой цепи или таймауте → forward:/fallback
+  │
+  ▼
+lb://<service-name>            — балансировка нагрузки между инстансами через Eureka
 ```
 
-Health and metrics:
-- `http://localhost:8075/actuator/health`
-- `http://localhost:8075/actuator/prometheus`
+При любой необработанной ошибке в реактивном пайплайне `GlobalErrorWebExceptionHandler` (`@Order(-2)`) гарантирует, что клиент получит структурированный JSON (`timestamp`, `path`, `status`, `error`, `requestId`), а не сырой стектрейс.
 
-## Docker Image
-Repository contains a production-oriented `Dockerfile`.
+## Безопасность
 
-```powershell
-cd C:\Project\API_Gateway
-.\mvnw.cmd clean package -DskipTests
-docker build -t ghcr.io/<your-user-or-org>/api-gateway:local .
-```
+- **JWT (HS256)** — подпись и валидация через `io.jsonwebtoken` (JJWT), секрет и время жизни токена конфигурируются через переменные окружения (`JWT_SECRET`, `JWT_EXPIRATION`);
+- Gateway **не выпускает** токены — только проверяет подпись и срок действия, аутентификация пользователя — задача отдельного сервиса; здесь реализован чисто **resource server**-сценарий на границе системы;
+- успешно прошедший проверку запрос получает заголовок `X-User-Id` — downstream-сервисы могут доверять личности пользователя без повторной валидации токена;
+- CORS настроен явно на уровне Spring Security и Gateway globalcors (allowed origins/methods/headers, `allowCredentials`).
 
-## Kubernetes Deployment
-Kubernetes manifests are in `k8s/`:
-- `namespace.yaml`
-- `configmap.yaml`
-- `deployment.yaml`
-- `service.yaml`
-- `hpa.yaml`
-- `ingress.yaml`
-- `kustomization.yaml`
+## Отказоустойчивость
 
-### Deploy
-1. Replace image in `k8s/deployment.yaml` and `k8s/kustomization.yaml`:
-   - `ghcr.io/<your-user-or-org>/api-gateway:<tag>`
-2. Apply manifests:
+Резилиенс настроен per-route через Resilience4j (`trainsCircuitBreaker`, `trainingCircuitBreaker`, `nutritionCircuitBreaker`, `notificationCircuitBreaker`, `recommendationCircuitBreaker`, `sagaCircuitBreaker`):
+
+| Параметр | Значение |
+|---|---|
+| Sliding window | 10 вызовов |
+| Минимум вызовов для расчёта | 5 |
+| Порог открытия (failure rate) | 50% |
+| Время в открытом состоянии | 10 секунд |
+| Half-open: пробных вызовов | 3 |
+| Timeout на вызов (TimeLimiter) | 5 секунд |
+
+При открытой цепи запрос форвардится на `/fallback`, который отвечает `503` с тем же `correlationId` — клиент получает предсказуемый ответ, а не зависший запрос или 500-ю с трассировкой.
+
+## Rate Limiting
+
+`RedisRateLimiter` (Spring Cloud Gateway) с настраиваемыми `replenish-rate` / `burst-capacity` (`RATE_LIMITER_REPLENISH_RATE`, `RATE_LIMITER_BURST_CAPACITY`). Ключ для лимитирования сейчас — IP клиента (`userKeyResolver`), что легко переключить на `X-User-Id` после JWT-фильтра без изменения остальной конфигурации.
+
+## Observability
+
+| Что | Как |
+|---|---|
+| Метрики | `/actuator/prometheus`, `/actuator/gateway` (состояние маршрутов) |
+| Distributed tracing | Micrometer Tracing + Zipkin/Brave, `tracing.sampling.probability=1.0` |
+| Логи | JSON-формат через `logstash-logback-encoder`, с `traceId`/`spanId` в каждой строке |
+| Дашборды | Prometheus + Grafana через `monitoring/docker-compose.monitoring.yml`, готовый дашборд `gateway-dashboard.json` |
+| Health | `/actuator/health` с включёнными readiness/liveness probes для Kubernetes |
+
+## Kubernetes
+
+Манифесты в `k8s/`:
+
+| Файл | Назначение |
+|---|---|
+| `namespace.yaml` | изолированный namespace `fitness-platform` |
+| `configmap.yaml` | конфигурация без пересборки образа |
+| `deployment.yaml` | Deployment с readiness/liveness-пробами |
+| `service.yaml` | ClusterIP-сервис |
+| `ingress.yaml` | внешний вход в кластер |
+| `hpa.yaml` | автомасштабирование 2→8 реплик по CPU (70%) и памяти (75%) |
+| `kustomization.yaml` | сборка манифестов через Kustomize |
+
+## Технологический стек
+
+| Категория | Технологии |
+|---|---|
+| Язык / Framework | Java 21, Spring Boot 3.x, Spring Cloud Gateway (reactive, WebFlux) |
+| Service Discovery | Netflix Eureka Client + Gateway discovery locator |
+| Безопасность | Spring Security (WebFlux), JJWT (HS256) |
+| Отказоустойчивость | Resilience4j (Circuit Breaker + TimeLimiter) |
+| Rate Limiting | Spring Cloud Gateway RedisRateLimiter, Reactive Redis |
+| Observability | Micrometer + Prometheus, Micrometer Tracing + Zipkin/Brave, Logstash JSON логи |
+| CI/CD | GitHub Actions с security gates, публикация образа |
+| Контейнеризация | Docker, Kubernetes (Deployment/Service/Ingress/HPA/ConfigMap), Kustomize |
+
+## Локальный запуск
+
+### Предварительно нужны
+- Java 21, Maven (или `./mvnw`)
+- Redis (для rate limiting)
+- Eureka Server, доступный по `EUREKA_SERVER_URL`
+- Запущенные downstream-сервисы, зарегистрированные в Eureka под именами из таблицы маршрутов
+
+### Запуск
 
 ```bash
-kubectl apply -k k8s
+export EUREKA_SERVER_URL=http://localhost:8761/eureka/
+export JWT_SECRET=your-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm
+export REDIS_HOST=localhost
+
+./mvnw clean package -DskipTests
+java -jar target/API_Gateway-0.0.1-SNAPSHOT.jar
 ```
 
-3. Verify rollout:
+Сервис поднимается на порту **8075**.
+
+| Что | Где |
+|---|---|
+| Health | `http://localhost:8075/actuator/health` |
+| Prometheus | `http://localhost:8075/actuator/prometheus` |
+| Состояние маршрутов | `http://localhost:8075/actuator/gateway/routes` |
+
+### Monitoring stack (Prometheus + Grafana)
 
 ```bash
-kubectl -n fitness-platform get pods,svc,hpa,ingress
-kubectl -n fitness-platform rollout status deploy/api-gateway
+docker compose -f monitoring/docker-compose.monitoring.yml up -d
 ```
 
-### Notes
-- Readiness/Liveness probes use `/actuator/health`.
-- HPA scales from 2 to 8 replicas by CPU and memory utilization.
-- `EUREKA_SERVER_URL` is managed via `ConfigMap`.
+Grafana — `http://localhost:3000`, готовый дашборд Gateway уже провижинится автоматически.
 
-## Monitoring (Docker Compose)
-```powershell
-cd C:\Project\API_Gateway
-docker network create training-network
-cd monitoring
-docker compose -f docker-compose.monitoring.yml up -d
-```
+### Kubernetes
 
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3000` (`admin` / `admin`)
-
-Important: `monitoring/prometheus/prometheus.yml` scrapes `api-gateway:8075`. If gateway runs outside that network, change target accordingly.
-
-## Environment Variables
-- `EUREKA_SERVER_URL` (default: `http://eureka-server:8761/eureka/`)
-- `SERVER_PORT` (default: `8075`)
-- `JAVA_OPTS` (optional JVM tuning)
-
-## CI/CD (GitHub Actions)
-Workflow: `.github/workflows/main.yml`
-
-Pipeline stages:
-1. Kubernetes manifests render + schema validation (`kustomize` + `kubeconform`).
-2. Maven build and tests (`mvn clean verify`).
-3. Filesystem vulnerability scan (Trivy SARIF).
-4. Docker buildx image build (and push on non-PR events to GHCR).
-5. Container image vulnerability scan (Trivy SARIF).
-6. SBOM generation (CycloneDX) for published image.
-
-## Quick Smoke Test
 ```bash
-curl http://localhost:8075/actuator/health
-curl http://localhost:8075/api/trains
-curl http://localhost:8075/api/nutrition/foods
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/hpa.yaml
+kubectl apply -f k8s/ingress.yaml
 ```
 
-## Troubleshooting
-- `503 from Gateway`: service not registered in Eureka or name mismatch.
-- `Cannot connect to Eureka`: wrong `EUREKA_SERVER_URL` or network/DNS issue.
-- `Prometheus has target DOWN`: wrong scrape target or gateway unreachable.
+## Связанные репозитории
 
-## Security Baseline Implemented
-- Non-root container runtime.
-- Read-only root filesystem in Kubernetes pod.
-- Dropped Linux capabilities.
-- Trivy security scans in CI for source and image.
-- SBOM generation in CI.
+Часть микросервисной платформы [FitFlow](https://github.com/Maru3022/project-hub):
+
+- [Eureka Server](https://github.com/Maru3022/Eureka-server)
+- [Saga Orchestrator](https://github.com/Maru3022/Saga-Orchestrator)
+- [Training Service](https://github.com/Maru3022/Training-Servive)
+- [Trains Service](https://github.com/Maru3022/Trains-Service)
+- [Nutrition Service](https://github.com/Maru3022/Training-Nutrition)
+- [Notification Service](https://github.com/Maru3022/Training_Notification)
+- [Recommendation Service](https://github.com/Maru3022/Recommendation-Service)
