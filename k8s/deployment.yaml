@@ -28,13 +28,23 @@ spec:
             - containerPort: 8080
               name: http
           env:
+            - name: SERVER_PORT
+              value: "8080"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: api-gateway-secrets
+                  key: JWT_SECRET
             - name: EUREKA_SERVER_URL
               valueFrom:
                 configMapKeyRef:
                   name: api-gateway-config
                   key: EUREKA_SERVER_URL
-            - name: JAVA_OPTS
-              value: "-Xms256m -Xmx512m"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms128m -XX:MaxRAMPercentage=70"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -62,8 +72,14 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
             capabilities:
               drop: ["ALL"]
       securityContext:
         seccompProfile:
           type: RuntimeDefault
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

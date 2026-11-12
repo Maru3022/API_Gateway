@@ -30,26 +30,20 @@ spring:
             allowCredentials: true
             maxAge: 3600
       routes:
-        - id: trains-service
-          uri: lb://trains-service
+        - id: auth-service
+          uri: ${TRAINING_SERVICE_URI:lb://training-service}
           predicates:
-            - Path=/api/users/**
+            - Path=/api/v1/auth/**
           filters:
-            - StripPrefix=1
-            - name: RequestRateLimiter
-              args:
-                key-resolver: "#{@userKeyResolver}"
-                rate-limiter: "#{@redisRateLimiter}"
             - name: CircuitBreaker
               args:
-                name: trainsCircuitBreaker
+                name: authCircuitBreaker
                 fallbackUri: forward:/fallback
         - id: training-service
-          uri: lb://training-service
+          uri: ${TRAINING_SERVICE_URI:lb://training-service}
           predicates:
-            - Path=/api/cabinets/**
+            - Path=/api/v1/users/**,/api/v1/trainings/**,/api/v1/exercises/**
           filters:
-            - StripPrefix=1
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
@@ -58,12 +52,24 @@ spring:
               args:
                 name: trainingCircuitBreaker
                 fallbackUri: forward:/fallback
-        - id: training-nutrition
-          uri: lb://training-nutrition
+        - id: trains-service
+          uri: ${TRAINS_SERVICE_URI:lb://trains-service}
           predicates:
-            - Path=/api/nutrition/**
+            - Path=/api/v1/plans/**,/api/v1/progress/**,/api/v1/stats/**,/api/v1/calculator/**
           filters:
-            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                rate-limiter: "#{@redisRateLimiter}"
+            - name: CircuitBreaker
+              args:
+                name: trainsCircuitBreaker
+                fallbackUri: forward:/fallback
+        - id: training-nutrition
+          uri: ${NUTRITION_SERVICE_URI:lb://training-nutrition}
+          predicates:
+            - Path=/api/v1/tips/**,/api/v1/advice/**,/api/v1/meal-logs/**,/api/v1/training/**,/api/v1/admin/tips/**
+          filters:
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
@@ -73,11 +79,10 @@ spring:
                 name: nutritionCircuitBreaker
                 fallbackUri: forward:/fallback
         - id: training-notification
-          uri: lb://training-notification
+          uri: ${NOTIFICATION_SERVICE_URI:lb://training-notification}
           predicates:
-            - Path=/api/notifications/**
+            - Path=/api/v1/notifications/**
           filters:
-            - StripPrefix=1
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
@@ -87,11 +92,10 @@ spring:
                 name: notificationCircuitBreaker
                 fallbackUri: forward:/fallback
         - id: recommendation-service
-          uri: lb://recommendation-service
+          uri: ${RECOMMENDATION_SERVICE_URI:lb://recommendation-service}
           predicates:
-            - Path=/api/recommendations/**
+            - Path=/api/v1/feed/**,/api/v1/posts/**,/api/v1/social/**,/api/v1/search/**
           filters:
-            - StripPrefix=1
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
@@ -101,11 +105,10 @@ spring:
                 name: recommendationCircuitBreaker
                 fallbackUri: forward:/fallback
         - id: saga-orchestrator
-          uri: lb://saga-orchestrator
+          uri: ${SAGA_SERVICE_URI:lb://saga-orchestrator}
           predicates:
-            - Path=/api/saga/**
+            - Path=/api/v1/sagas/**
           filters:
-            - StripPrefix=1
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@userKeyResolver}"
@@ -168,7 +171,7 @@ management:
       probability: 1.0
 
 jwt:
-  secret: ${JWT_SECRET:your-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm}
+  secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
 
 eureka:
