@@ -16,8 +16,8 @@ import java.util.Arrays;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-    @Value("${gateway.cors.allowed-origins:http://localhost:3000,http://localhost:5000,http://localhost:8080}")
-    private String[] allowedOrigins = {"http://localhost:3000", "http://localhost:5000", "http://localhost:8080"};
+    @Value("${gateway.cors.allowed-origins:http://localhost:3000,http://localhost:5000,http://localhost:5173,http://localhost:8080}")
+    private String[] allowedOrigins = {"http://localhost:3000", "http://localhost:5000", "http://localhost:5173", "http://localhost:8080"};
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {

@@ -33,6 +33,10 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         String path = exchange.getRequest().getURI().getPath();
         if (HttpMethod.OPTIONS.equals(exchange.getRequest().getMethod())
                 || path.startsWith("/api/v1/auth/")
+                || (HttpMethod.GET.equals(exchange.getRequest().getMethod())
+                    && path.matches("/api/v1/users/[0-9a-fA-F-]+/avatar"))
+                || (HttpMethod.GET.equals(exchange.getRequest().getMethod())
+                    && path.startsWith("/api/v1/media/"))
                 || path.startsWith("/actuator/")) {
             return chain.filter(withoutIdentityHeaders(exchange));
         }
