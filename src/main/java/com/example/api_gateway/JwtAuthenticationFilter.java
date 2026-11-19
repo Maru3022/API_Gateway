@@ -18,9 +18,13 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String USER_ROLE_HEADER = "X-User-Role";
+    private static final String INTERNAL_GATEWAY_SECRET_HEADER = "X-Internal-Gateway-Secret";
 
     @Value("${gateway.jwt.user-id-header}")
     private String userIdHeader;
+
+    @Value("${internal.gateway.secret}")
+    private String gatewaySecret;
 
     private final JwtUtil jwtUtil;
 
@@ -64,8 +68,10 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                                             .headers(headers -> {
                                                 headers.remove(userIdHeader);
                                                 headers.remove(USER_ROLE_HEADER);
+                                                headers.remove(INTERNAL_GATEWAY_SECRET_HEADER);
                                                 headers.set(userIdHeader, identity.getT1());
                                                 headers.set(USER_ROLE_HEADER, identity.getT2());
+                                                headers.set(INTERNAL_GATEWAY_SECRET_HEADER, gatewaySecret);
                                             })
                                             .build();
                                     return chain.filter(exchange.mutate().request(mutatedRequest).build());
@@ -82,6 +88,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                 .headers(headers -> {
                     headers.remove(userIdHeader);
                     headers.remove(USER_ROLE_HEADER);
+                    headers.remove(INTERNAL_GATEWAY_SECRET_HEADER);
+                    headers.set(INTERNAL_GATEWAY_SECRET_HEADER, gatewaySecret);
                 })
                 .build();
         return exchange.mutate().request(request).build();

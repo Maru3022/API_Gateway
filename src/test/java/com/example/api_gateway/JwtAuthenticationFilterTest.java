@@ -10,7 +10,27 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 class JwtAuthenticationFilterTest {
+    @Test
+    void gatewayAddsInternalSecretAndRemovesClientSuppliedValue() {
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/auth/login")
+                .header("X-Internal-Gateway-Secret", "forged"));
+        var forwarded = new AtomicReference<ServerWebExchange>();
+        GatewayFilterChain chain = request -> {
+            forwarded.set(request);
+            return reactor.core.publisher.Mono.empty();
+        };
+        var filter = new JwtAuthenticationFilter(mock(JwtUtil.class));
+        ReflectionTestUtils.setField(filter, "gatewaySecret", "test-gateway-secret");
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals("test-gateway-secret", forwarded.get().getRequest().getHeaders()
+                .getFirst("X-Internal-Gateway-Secret"));
+    }
+
     @Test
     void forgedIdentityWithoutTokenIsNotForwarded() {
         var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/users/123")

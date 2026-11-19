@@ -35,6 +35,11 @@ spec:
                 secretKeyRef:
                   name: api-gateway-secrets
                   key: JWT_SECRET
+            - name: INTERNAL_GATEWAY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: fitflow-internal-secrets
+                  key: INTERNAL_GATEWAY_SECRET
             - name: EUREKA_SERVER_URL
               valueFrom:
                 configMapKeyRef:

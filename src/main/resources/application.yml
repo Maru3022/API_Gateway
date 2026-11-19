@@ -125,10 +125,15 @@ gateway:
     burst-capacity: ${RATE_LIMITER_BURST_CAPACITY:20}
   jwt:
     user-id-header: ${JWT_USER_ID_HEADER:X-User-Id}
+
   fallback:
     error-message: ${FALLBACK_ERROR_MESSAGE:Service temporarily unavailable}
     error-key: ${FALLBACK_ERROR_KEY:error}
     correlation-id-key: ${FALLBACK_CORRELATION_ID_KEY:correlationId}
+
+internal:
+  gateway:
+    secret: ${INTERNAL_GATEWAY_SECRET}
 
 resilience4j:
   circuitbreaker:
