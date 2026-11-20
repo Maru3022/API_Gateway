@@ -29,6 +29,16 @@ jobs:
           cache: maven
       - name: Verify application
         run: mvn -B -ntp clean verify
+      - name: Install kubectl
+        shell: bash
+        run: |
+          version=v1.30.2
+          base="https://dl.k8s.io/release/${version}/bin/linux/amd64"
+          curl --fail --silent --show-error --location --output kubectl "${base}/kubectl"
+          curl --fail --silent --show-error --location --output kubectl.sha256 "${base}/kubectl.sha256"
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+          chmod +x kubectl
+          echo "$PWD" >> "$GITHUB_PATH"
       - name: Install kubeconform
         shell: bash
         run: |
@@ -89,3 +99,4 @@ jobs:
           digest="$(printf '%s\n' "$push_output" | awk '/digest: sha256:/ {print $2}' | tail -1)"
           test -n "$digest"
           echo "image=${image}@${digest}" >> "$GITHUB_OUTPUT"
+
