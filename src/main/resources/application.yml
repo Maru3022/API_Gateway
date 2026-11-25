@@ -12,7 +12,7 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true
+          enabled: false
       globalcors:
         corsConfigurations:
           '[/**]':

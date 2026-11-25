@@ -4,7 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -21,13 +21,13 @@ public class FallbackController {
     @Value("${gateway.fallback.correlation-id-key}")
     private String correlationIdKey;
 
-    @GetMapping("/fallback")
+    @RequestMapping("/fallback")
     public ResponseEntity<Map<String, Object>> fallback(ServerHttpRequest request) {
         String correlationId = request.getHeaders().getFirst(GlobalCorrelationIdFilter.CORRELATION_ID_HEADER);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of(
                         errorKey, errorMessage,
-                        correlationIdKey, correlationId
+                        correlationIdKey, correlationId == null ? "" : correlationId
                 ));
     }
 }
