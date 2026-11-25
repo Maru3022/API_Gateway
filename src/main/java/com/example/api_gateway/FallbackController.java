@@ -5,8 +5,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -21,13 +23,23 @@ public class FallbackController {
     @Value("${gateway.fallback.correlation-id-key}")
     private String correlationIdKey;
 
-    @RequestMapping("/fallback")
+    @RequestMapping(
+            path = "/fallback",
+            method = {
+                RequestMethod.GET,
+                RequestMethod.POST,
+                RequestMethod.PUT,
+                RequestMethod.PATCH,
+                RequestMethod.DELETE,
+                RequestMethod.OPTIONS
+            },
+            produces = "application/json"
+)
     public ResponseEntity<Map<String, Object>> fallback(ServerHttpRequest request) {
-        String correlationId = request.getHeaders().getFirst(GlobalCorrelationIdFilter.CORRELATION_ID_HEADER);
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(Map.of(
-                        errorKey, errorMessage,
-                        correlationIdKey, correlationId == null ? "" : correlationId
-                ));
+        String correlationId = request.getHeaders().getFirst("X-Correlation-Id");
+        Map<String, Object> body = new HashMap<>();
+        body.put(errorKey, errorMessage);
+        body.put("correlationId", correlationId == null ? "" : correlationId);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
     }
 }
