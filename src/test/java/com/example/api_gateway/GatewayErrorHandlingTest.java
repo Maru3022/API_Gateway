@@ -24,10 +24,10 @@ class GatewayErrorHandlingTest {
     @ValueSource(strings = {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
     void fallbackAcceptsOriginalMethodWithoutReplayingOperation(String method) {
         var controller = new FallbackController();
+        var client = WebTestClient.bindToController(controller).build();
         ReflectionTestUtils.setField(controller, "errorMessage", "Service temporarily unavailable");
         ReflectionTestUtils.setField(controller, "errorKey", "error");
         ReflectionTestUtils.setField(controller, "correlationIdKey", "correlationId");
-        var client = WebTestClient.bindToController(controller).build();
         client.method(HttpMethod.valueOf(method)).uri("/fallback")
                 .header("X-Correlation-Id", "request-123")
                 .exchange().expectStatus().isEqualTo(503)

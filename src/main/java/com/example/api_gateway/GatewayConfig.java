@@ -19,9 +19,14 @@ public class GatewayConfig {
 
     @Bean
     public KeyResolver userKeyResolver() {
-        return exchange -> Mono.just(exchange.getRequest().getRemoteAddress() != null
-                ? exchange.getRequest().getRemoteAddress().getHostString()
-                : "unknown");
+        return exchange -> {
+            String user = exchange.getAttribute(JwtAuthenticationFilter.VERIFIED_USER_ATTRIBUTE);
+            if (user != null && !user.isBlank()) {
+                return Mono.just("user:" + user);
+            }
+            return Mono.just("anonymous:" + (exchange.getRequest().getRemoteAddress() != null
+                    ? exchange.getRequest().getRemoteAddress().getHostString() : "unknown"));
+        };
     }
 
     @Bean
