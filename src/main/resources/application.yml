@@ -156,12 +156,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, prometheus, metrics, gateway
+        include: health
   endpoint:
     prometheus:
-      enabled: true
+      enabled: false
     health:
-      show-details: always
+      show-details: never
+      show-components: never
       probes:
         enabled: true
   metrics:

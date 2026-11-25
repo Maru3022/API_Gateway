@@ -25,7 +25,8 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/actuator/**").permitAll()
+                        .pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .pathMatchers("/actuator/**").denyAll()
                         .anyExchange().permitAll()
                 )
                 .build();

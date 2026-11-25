@@ -44,7 +44,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     && path.matches("/api/v1/users/[0-9a-fA-F-]+/avatar"))
                 || (HttpMethod.GET.equals(exchange.getRequest().getMethod())
                     && path.startsWith("/api/v1/media/"))
-                || path.startsWith("/actuator/")) {
+                || "/actuator/health".equals(path)
+                || path.startsWith("/actuator/health/")) {
             return chain.filter(withoutIdentityHeaders(exchange));
         }
 
