@@ -15,6 +15,8 @@ import reactor.core.publisher.Mono;
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
+    public static final String VERIFIED_USER_ATTRIBUTE = JwtAuthenticationFilter.class.getName() + ".user";
+
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String USER_ROLE_HEADER = "X-User-Role";
@@ -34,6 +36,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        exchange.getAttributes().remove(VERIFIED_USER_ATTRIBUTE);
         String path = exchange.getRequest().getURI().getPath();
         if (HttpMethod.OPTIONS.equals(exchange.getRequest().getMethod())
                 || path.startsWith("/api/v1/auth/")
@@ -41,7 +44,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     && path.matches("/api/v1/users/[0-9a-fA-F-]+/avatar"))
                 || (HttpMethod.GET.equals(exchange.getRequest().getMethod())
                     && path.startsWith("/api/v1/media/"))
-                || path.startsWith("/actuator/")) {
+                || "/actuator/health".equals(path)
+                || path.startsWith("/actuator/health/")) {
             return chain.filter(withoutIdentityHeaders(exchange));
         }
 
@@ -64,6 +68,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                                     return exchange.getResponse().setComplete().then(Mono.<reactor.util.function.Tuple2<String, String>>empty());
                                 }))
                                 .flatMap(identity -> {
+                                    exchange.getAttributes().put(VERIFIED_USER_ATTRIBUTE, identity.getT1());
                                     ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                                             .headers(headers -> {
                                                 headers.remove(userIdHeader);

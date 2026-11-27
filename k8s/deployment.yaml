@@ -25,11 +25,11 @@ spec:
           image: your-registry/api-gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - containerPort: 8075
               name: http
           env:
             - name: SERVER_PORT
-              value: "8080"
+              value: "8075"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -54,15 +54,22 @@ spec:
             httpGet:
               path: /actuator/health/readiness
               port: http
-            initialDelaySeconds: 20
+            initialDelaySeconds: 120
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 5
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: http
-            initialDelaySeconds: 45
+            initialDelaySeconds: 180
             periodSeconds: 15
             timeoutSeconds: 3
             failureThreshold: 3
@@ -72,7 +79,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 768Mi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

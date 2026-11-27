@@ -12,14 +12,19 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true
+          enabled: false
       globalcors:
         corsConfigurations:
           '[/**]':
             allowedOrigins:
               - "http://localhost:3000"
+              - "http://127.0.0.1:3000"
               - "http://localhost:5173"
+              - "http://127.0.0.1:5173"
+              - "http://localhost:5174"
+              - "http://127.0.0.1:5174"
               - "http://localhost:8080"
+              - "http://127.0.0.1:8080"
             allowedMethods:
               - GET
               - POST
@@ -156,12 +161,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, prometheus, metrics, gateway
+        include: health
   endpoint:
     prometheus:
-      enabled: true
+      enabled: false
     health:
-      show-details: always
+      show-details: never
+      show-components: never
       probes:
         enabled: true
   metrics:
