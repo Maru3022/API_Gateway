@@ -20,16 +20,20 @@ spec:
         prometheus.io/path: "/actuator/prometheus"
         prometheus.io/port: "8080"
     spec:
+      initContainers:
+        - name: wait-for-training-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until wget -q -O /dev/null http://training-service:8085/actuator/health/readiness; do sleep 3; done"]
       containers:
         - name: api-gateway
           image: your-registry/api-gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - containerPort: 8075
               name: http
           env:
             - name: SERVER_PORT
-              value: "8080"
+              value: "8075"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -54,15 +58,22 @@ spec:
             httpGet:
               path: /actuator/health/readiness
               port: http
-            initialDelaySeconds: 20
+            initialDelaySeconds: 120
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 5
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: http
-            initialDelaySeconds: 45
+            initialDelaySeconds: 180
             periodSeconds: 15
             timeoutSeconds: 3
             failureThreshold: 3
@@ -72,7 +83,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 768Mi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
