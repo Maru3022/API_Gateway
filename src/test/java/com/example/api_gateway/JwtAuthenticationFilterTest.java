@@ -57,6 +57,8 @@ class JwtAuthenticationFilterTest {
         assertDoesNotThrow(config::validateAllowCredentials);
         assertEquals("http://127.0.0.1:5173", config.checkOrigin("http://127.0.0.1:5173"));
         assertEquals("http://localhost:5173", config.checkOrigin("http://localhost:5173"));
+        assertEquals("http://127.0.0.1:5174", config.checkOrigin("http://127.0.0.1:5174"));
+        assertEquals("http://localhost:5174", config.checkOrigin("http://localhost:5174"));
         assertNull(config.checkOrigin("https://untrusted.example"));
     }
 }
