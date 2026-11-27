@@ -55,6 +55,8 @@ class JwtAuthenticationFilterTest {
         var config = new SecurityConfig().corsConfigurationSource().getCorsConfiguration(exchange);
         assertNotNull(config);
         assertDoesNotThrow(config::validateAllowCredentials);
+        assertEquals("http://127.0.0.1:5173", config.checkOrigin("http://127.0.0.1:5173"));
+        assertEquals("http://localhost:5173", config.checkOrigin("http://localhost:5173"));
         assertNull(config.checkOrigin("https://untrusted.example"));
     }
 }
